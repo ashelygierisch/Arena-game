@@ -280,16 +280,16 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
     }
 
     function purgeAll() {
-      if (state.mode !== "play") return;
+      if (state.mode !== "play") return false;
       if (player.purgeCd > 0) {
-        state.banner = "PURGE  " + Math.ceil(player.purgeCd) + "s";
-        state.bannerT = 0.9;
+        state.banner = "PURGE READY IN  " + Math.ceil(player.purgeCd) + "s";
+        state.bannerT = 1.1;
         beep(90, 0.08, "square", 0.04);
-        return;
+        return false;
       }
-      player.purgeCd = player.purgeMax;
+      player.purgeCd = 30;
       state.shake = 14;
-      state.banner = "FIELD PURGE";
+      state.banner = "ALL DRONES DOWN";
       state.bannerT = 1.6;
       beep(80, 0.28, "sawtooth", 0.08);
       burst(player.x, player.y, A, 36, 320, 5);
@@ -298,6 +298,7 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
         killEnemy(enemies[i], i);
       }
       hostile.length = 0;
+      return true;
     }
 
     function hurtPlayer(amount) {
@@ -884,7 +885,7 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
     }
 
     function drawHud() {
-      panel(12, 12, 250, 92, P);
+      panel(12, 12, 250, 100, P);
       ctx.fillStyle = HUD; ctx.font = "700 10px " + FONT; ctx.textAlign = "left";
       ctx.fillText("HULL INTEGRITY", 24, 30);
       ctx.fillStyle = "rgba(255,255,255,0.12)"; ctx.fillRect(24, 38, 226, 9);
@@ -893,9 +894,13 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
       glow(hpCol, 8); ctx.fillStyle = hpCol; ctx.fillRect(24, 38, 226 * clamp(hpPct, 0, 1), 9); noGlow();
       ctx.fillStyle = HUD; ctx.font = "600 12px " + FONT2;
       ctx.fillText(Math.ceil(player.hp) + " / " + player.maxHp + "   SHD " + player.shields + "/3", 24, 64);
-      const spec = player.specialCd > 0 ? player.specialCd.toFixed(1) + "s" : "RDY";
-      const purge = player.purgeCd > 0 ? Math.ceil(player.purgeCd) + "s" : "RDY";
-      ctx.fillText("DASH " + (player.dashCd > 0 ? player.dashCd.toFixed(1) : "RDY") + "   F " + spec + "   R " + purge, 24, 84);
+      roundRect(24, 72, 226, 28, 4);
+      ctx.fillStyle = player.purgeCd > 0 ? "rgba(255,255,255,0.06)" : "rgba(255,43,214,0.22)";
+      ctx.fill();
+      ctx.strokeStyle = A; ctx.stroke();
+      ctx.fillStyle = player.purgeCd > 0 ? HUD : A;
+      ctx.font = "700 11px " + FONT;
+      ctx.fillText(player.purgeCd > 0 ? ("R  PURGE  " + Math.ceil(player.purgeCd) + "s") : "R  PURGE  ALL  [READY]", 32, 91);
 
       panel((BAR_X - 12) * 0.5 - 200, 12, 400, 44, S);
       ctx.textAlign = "center"; ctx.fillStyle = HUD; ctx.font = "700 12px " + FONT;
@@ -1047,7 +1052,10 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
         player.dashT = 0.18; player.dashCd = 1.45; player.hitT = 0.18; beep(240, 0.08, "sine", 0.05);
       }
       if (state.mode === "play" && (e.code === "KeyF" || e.code === "KeyQ")) launchSpecial();
-      if (state.mode === "play" && e.code === "KeyR") purgeAll();
+      if (state.mode === "play" && (e.code === "KeyR" || e.key === "r" || e.key === "R")) {
+        e.preventDefault();
+        purgeAll();
+      }
       const slotMap = { Digit1: 1, Numpad1: 1, Digit2: 2, Numpad2: 2, Digit3: 3, Numpad3: 3, Digit4: 4, Numpad4: 4, Digit5: 5, Numpad5: 5, Digit6: 6, Numpad6: 6 };
       if (slotMap[e.code] && (state.mode === "play" || state.mode === "shop")) equipSlot(slotMap[e.code]);
     }
@@ -1059,7 +1067,10 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
       canvas.focus(); ensureAudio();
       const p = canvasPos(e); mouse.x = p.x; mouse.y = p.y;
       if (state.mode === "boot" || state.mode === "over") { resetRun(); return; }
-      if (state.mode === "shop") tryBuyAt(p.x, p.y);
+      if (state.mode === "shop") { tryBuyAt(p.x, p.y); return; }
+      if (state.mode === "play" && p.x >= 24 && p.x <= 250 && p.y >= 72 && p.y <= 100) {
+        purgeAll();
+      }
     });
     canvas.focus();
     requestAnimationFrame(frame);
