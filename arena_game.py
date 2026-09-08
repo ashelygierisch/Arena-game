@@ -145,7 +145,7 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
     const state = {
       mode: "boot", t: 0, wave: 1, cores: 0, score: 0, combo: 0, comboTimer: 0,
       capturedBonusArmed: true, shake: 0, banner: "", bannerT: 0, spawnTimer: 1.2,
-      enemiesAliveTarget: 4, shopNote: "", shopNoteT: 0,
+      enemiesAliveTarget: 7, shopNote: "", shopNoteT: 0,
       high: Number(localStorage.getItem("neonDominationHi") || 0)
     };
     const player = {
@@ -231,12 +231,12 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
       if (state.wave >= 3 && kindRoll > 0.66) kind = "hunter";
       if (state.wave >= 5 && kindRoll > 0.84) kind = "tank";
       const hpBase = kind === "tank" ? 5 : 2;
-      const speedBase = kind === "hunter" ? 128 : kind === "tank" ? 60 : 84;
+      const speedBase = kind === "hunter" ? 86 : kind === "tank" ? 46 : 56;
       enemies.push({
         id: uid++, x: x, y: y, kind: kind, r: kind === "tank" ? 20 : 15,
         hp: Math.max(1, Math.round(hpBase * (CFG.enemy_hp_mult || 1))),
         maxHp: Math.max(1, Math.round(hpBase * (CFG.enemy_hp_mult || 1))),
-        speed: speedBase * (CFG.enemy_speed_mult || 1) * (0.92 + state.wave * 0.035),
+        speed: speedBase * (CFG.enemy_speed_mult || 1) * (0.9 + state.wave * 0.018),
         angle: 0, spin: rand(0, TAU), fireCd: rand(0.4, 1.5)
       });
     }
@@ -325,7 +325,7 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
       bases.forEach(function (b) { b.progress = 0; b.owner = 0; b.guns = null; });
       state.wave = 1; state.cores = 0; state.score = 0; state.combo = 0; state.comboTimer = 0;
       state.capturedBonusArmed = true; state.shake = 0; state.spawnTimer = 0.6;
-      state.enemiesAliveTarget = 4; state.banner = "WAVE 01"; state.bannerT = 2.2; state.mode = "play";
+      state.enemiesAliveTarget = 7; state.banner = "WAVE 01"; state.bannerT = 2.2; state.mode = "play";
     }
 
     function note(msg, ok) {
@@ -503,11 +503,11 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
 
     function armNode(b) {
       b.guns = [];
-      for (let i = 0; i < 8; i++) {
-        b.guns.push({ a: i * TAU / 8, fireCd: i * 0.08, aim: i * TAU / 8, x: b.x, y: b.y });
+      for (let i = 0; i < 3; i++) {
+        b.guns.push({ a: i * TAU / 3, fireCd: i * 0.15, aim: i * TAU / 3, x: b.x, y: b.y });
       }
       burst(b.x, b.y, P, 22, 180, 3);
-      state.banner = "8 GUN BARRELS  ONLINE";
+      state.banner = "3 GUN BARRELS  ONLINE";
       state.bannerT = 1.5;
     }
 
@@ -595,14 +595,14 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
     }
 
     function updateWaves(dt) {
-      const cap = Math.min(16, Math.round(state.enemiesAliveTarget * (CFG.spawn_rate_mult || 1)));
+      const cap = Math.min(26, Math.round(state.enemiesAliveTarget * (CFG.spawn_rate_mult || 1)));
       state.spawnTimer -= dt;
       if (enemies.length < cap && state.spawnTimer <= 0) {
         spawnEnemy();
-        state.spawnTimer = Math.max(0.32, 1.2 - state.wave * 0.05) / (CFG.spawn_rate_mult || 1);
+        state.spawnTimer = Math.max(0.16, 0.72 - state.wave * 0.035) / (CFG.spawn_rate_mult || 1);
       }
       if (state.score > state.wave * 220) {
-        state.wave += 1; state.enemiesAliveTarget = 4 + state.wave * 2;
+        state.wave += 1; state.enemiesAliveTarget = 7 + state.wave * 3;
         state.banner = "WAVE " + String(state.wave).padStart(2, "0"); state.bannerT = 2; beep(440, 0.16, "square", 0.05);
       }
     }
