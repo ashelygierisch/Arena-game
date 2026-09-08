@@ -156,9 +156,9 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
     };
     const bullets = [], hostile = [], specials = [], enemies = [], particles = [], floaters = [];
     const bases = [
-      { x: 200, y: 190, r: 50, progress: 0, owner: 0, spin: 0 },
-      { x: 690, y: 190, r: 50, progress: 0, owner: 0, spin: 1.2 },
-      { x: 445, y: 470, r: 50, progress: 0, owner: 0, spin: 2.4 }
+      { x: 200, y: 190, r: 50, progress: 0, owner: 0, spin: 0, guns: null },
+      { x: 690, y: 190, r: 50, progress: 0, owner: 0, spin: 1.2, guns: null },
+      { x: 445, y: 470, r: 50, progress: 0, owner: 0, spin: 2.4, guns: null }
     ];
 
     function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
@@ -322,7 +322,7 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
       player.dashCd = 0; player.dashT = 0; player.hitT = 0; player.specialCd = 0; player.healCd = 0;
       player.equip = "pulse"; player.owned = { pulse: true }; player.velocity = false; player.rapid = false;
       bullets.length = 0; hostile.length = 0; specials.length = 0; enemies.length = 0; particles.length = 0; floaters.length = 0;
-      bases.forEach(function (b) { b.progress = 0; b.owner = 0; });
+      bases.forEach(function (b) { b.progress = 0; b.owner = 0; b.guns = null; });
       state.wave = 1; state.cores = 0; state.score = 0; state.combo = 0; state.comboTimer = 0;
       state.capturedBonusArmed = true; state.shake = 0; state.spawnTimer = 0.6;
       state.enemiesAliveTarget = 4; state.banner = "WAVE 01"; state.bannerT = 2.2; state.mode = "play";
@@ -501,6 +501,52 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
       }
     }
 
+    function armNode(b) {
+      b.guns = [];
+      for (let i = 0; i < 8; i++) {
+        b.guns.push({ a: i * TAU / 8, fireCd: i * 0.08, aim: i * TAU / 8, x: b.x, y: b.y });
+      }
+      burst(b.x, b.y, P, 22, 180, 3);
+      state.banner = "8 GUN BARRELS  ONLINE";
+      state.bannerT = 1.5;
+    }
+
+    function disarmNode(b) {
+      if (b.guns) {
+        for (let i = 0; i < b.guns.length; i++) burst(b.guns[i].x, b.guns[i].y, D, 8, 90, 2);
+      }
+      b.guns = null;
+    }
+
+    function fireShell(gx, gy, ang) {
+      bullets.push({
+        kind: "shell", tint: P, dmg: 1, splash: 0, pierce: 0, homing: false,
+        x: gx + Math.cos(ang) * 14, y: gy + Math.sin(ang) * 14,
+        vx: Math.cos(ang) * 400, vy: Math.sin(ang) * 400,
+        life: 1.15, r: 3.6, hit: Object.create(null)
+      });
+      beep(320, 0.04, "square", 0.018);
+    }
+
+    function updateNodeGuns(b, dt) {
+      const target = nearestEnemy(b);
+      for (let i = 0; i < b.guns.length; i++) {
+        const g = b.guns[i];
+        const ring = g.a + b.spin * 0.18;
+        g.x = b.x + Math.cos(ring) * (b.r + 7);
+        g.y = b.y + Math.sin(ring) * (b.r + 7);
+        g.fireCd -= dt;
+        if (target) {
+          g.aim = lerpAngle(g.aim, Math.atan2(target.y - g.y, target.x - g.x), 0.2);
+          if (g.fireCd <= 0 && dist(g.x, g.y, target.x, target.y) < 380) {
+            fireShell(g.x, g.y, g.aim);
+            burst(g.x + Math.cos(g.aim) * 10, g.y + Math.sin(g.aim) * 10, P, 3, 55, 1.5);
+            g.fireCd = 0.58;
+          }
+        }
+      }
+    }
+
     function updateBases(dt) {
       player.healCd = (player.healCd || 0) - dt;
       for (let i = 0; i < bases.length; i++) {
@@ -521,11 +567,24 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
         }
         if (playerOn && !enemyOn) {
           b.progress = clamp(b.progress + dt * 28, 0, 100);
-          if (b.progress >= 100 && b.owner !== 1) { b.owner = 1; floater(b.x, b.y - 40, "NODE SECURED", P); beep(520, 0.2, "sine", 0.07); }
+          if (b.progress >= 100 && b.owner !== 1) {
+            b.owner = 1;
+            armNode(b);
+            floater(b.x, b.y - 40, "NODE SECURED", P);
+            beep(520, 0.2, "sine", 0.07);
+          }
         } else if (enemyOn && !playerOn) {
           b.progress = clamp(b.progress - dt * 22, 0, 100);
-          if (b.progress <= 0 && b.owner === 1) { b.owner = 0; floater(b.x, b.y - 40, "NODE LOST", D); }
+          if (b.progress <= 0 && b.owner === 1) {
+            b.owner = 0;
+            disarmNode(b);
+            floater(b.x, b.y - 40, "TURRETS DOWN", D);
+          }
         } else if (!playerOn && b.owner !== 1) b.progress = clamp(b.progress - dt * 8, 0, 100);
+        if (b.owner === 1) {
+          if (!b.guns) armNode(b);
+          updateNodeGuns(b, dt);
+        } else if (b.guns) disarmNode(b);
       }
       if (capturedCount() === 3 && state.capturedBonusArmed) {
         const bonus = Math.round(750 * (CFG.score_mult || 1));
@@ -641,7 +700,20 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
         for (let k = 0; k < 6; k++) { ctx.rotate(TAU / 6); ctx.beginPath(); ctx.moveTo(0, 14); ctx.lineTo(0, b.r - 14); ctx.stroke(); }
         noGlow(); ctx.restore();
         ctx.font = "700 11px " + FONT2; ctx.fillStyle = HUD; ctx.textAlign = "center";
-        ctx.fillText("NODE " + (i + 1) + (b.owner === 1 ? "  OWNED" : ""), b.x, b.y + b.r + 16);
+        ctx.fillText("NODE " + (i + 1) + (b.owner === 1 ? "  GUNS ONLINE" : ""), b.x, b.y + b.r + 22);
+        if (b.guns) {
+          for (let g = 0; g < b.guns.length; g++) {
+            const gun = b.guns[g];
+            ctx.save(); ctx.translate(gun.x, gun.y); ctx.rotate(gun.aim);
+            glow(P, 10);
+            ctx.fillStyle = "#07141c"; ctx.strokeStyle = P; ctx.lineWidth = 1.6;
+            ctx.beginPath(); ctx.arc(0, 0, 6.5, 0, TAU); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = P;
+            ctx.fillRect(2, -2.4, 14, 4.8);
+            ctx.fillStyle = "#fff"; ctx.fillRect(12, -1.4, 5, 2.8);
+            noGlow(); ctx.restore();
+          }
+        }
       }
     }
 
@@ -678,6 +750,12 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
           const ang = Math.atan2(b.vy, b.vx);
           ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(ang);
           ctx.fillStyle = "#ff8a3d"; ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-8, 4); ctx.lineTo(-8, -4); ctx.closePath(); ctx.fill();
+          ctx.restore();
+        } else if (b.kind === "shell") {
+          const ang = Math.atan2(b.vy, b.vx);
+          ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(ang);
+          ctx.fillStyle = P; ctx.beginPath(); ctx.ellipse(0, 0, 8, 3.1, 0, 0, TAU); ctx.fill();
+          ctx.fillStyle = "#fff"; ctx.fillRect(-1, -1.6, 5, 3.2);
           ctx.restore();
         } else if (b.kind === "needle") {
           ctx.strokeStyle = "#fff"; ctx.lineWidth = 2;
