@@ -39,7 +39,7 @@ def inject_chrome() -> None:
           }
           header, footer, [data-testid="stToolbar"], #MainMenu { visibility: hidden; height: 0; }
           [data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"] { display: none !important; }
-          .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"] {
+          html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"] {
             overflow-x: hidden;
           }
           .block-container,
@@ -47,16 +47,23 @@ def inject_chrome() -> None:
           .stMainBlockContainer {
             max-width: 100% !important;
             width: 100% !important;
-            padding-top: 0.8rem !important;
-            padding-bottom: 1rem !important;
-            padding-left: 1rem !important;
-            padding-right: 1rem !important;
+            padding-top: 0.35rem !important;
+            padding-bottom: 0.35rem !important;
+            padding-left: 0.7rem !important;
+            padding-right: 0.7rem !important;
           }
-          [data-testid="stIFrame"],
-          iframe {
+          [data-testid="stIFrame"] {
             width: 100% !important;
             max-width: 100% !important;
+              height: calc(100vh - 176px) !important;
           }
+          [data-testid="stIFrame"] iframe,
+          iframe {
+            width: 100% !important;
+            height: 100% !important;
+            max-width: 100% !important;
+          }
+          [data-testid="stAlert"] { padding: 0.25rem 0.6rem !important; font-size: 12px !important; }
           h1, h2, h3, .stMarkdown p, .stCaption, label {
             font-family: "Rajdhani", sans-serif;
           }
@@ -66,11 +73,14 @@ def inject_chrome() -> None:
               linear-gradient(90deg, rgba(0, 240, 255, 0.08), rgba(123, 97, 255, 0.08) 50%, rgba(255, 43, 214, 0.08)),
               rgba(6, 8, 20, 0.75);
             box-shadow: 0 0 40px rgba(0, 240, 255, 0.12), inset 0 0 40px rgba(123, 97, 255, 0.08);
-            padding: 22px 28px 18px;
-            margin-bottom: 12px;
+            padding: 8px 16px;
+            margin-bottom: 6px;
             position: relative;
             overflow: hidden;
           }
+          .hero-wrap.compact { padding: 6px 14px; margin-bottom: 4px; }
+          .hero-wrap.compact .hero-kicker,
+          .hero-wrap.compact .hero-sub { display: none; }
           .hero-wrap::after {
             content: "";
             position: absolute;
@@ -94,12 +104,13 @@ def inject_chrome() -> None:
           .hero-title {
             font-family: "Orbitron", sans-serif;
             font-weight: 900;
-            font-size: 34px;
+            font-size: 20px;
             letter-spacing: 0.08em;
             color: #f4fbff;
             text-shadow: 0 0 18px rgba(0, 240, 255, 0.55);
             margin: 0;
           }
+          .hero-wrap.compact .hero-title { font-size: 16px; }
           .hero-title span { color: #ff2bd6; }
           .hero-sub {
             margin-top: 8px;
@@ -123,7 +134,7 @@ def inject_chrome() -> None:
             font-family: "Orbitron", sans-serif;
             font-weight: 800;
             letter-spacing: 0.18em;
-            padding: 0.7rem 1rem;
+            padding: 0.45rem 0.8rem;
             box-shadow: 0 0 22px rgba(0, 240, 255, 0.35);
           }
           .stButton > button:hover {
@@ -198,10 +209,11 @@ def nav_choice() -> str:
         return st.radio("Command deck", ["Arena", "Intel Brief", "Loadout"], horizontal=True)
 
 
-def render_hero() -> None:
+def render_hero(compact: bool = False) -> None:
+    klass = "hero-wrap compact" if compact else "hero-wrap"
     st.markdown(
-        """
-        <div class="hero-wrap">
+        f"""
+        <div class="{klass}">
           <div class="hero-kicker">REWORKD  //  SECTOR 09  //  LIVE FEED</div>
           <p class="hero-title">NEON <span>DOMINATION</span></p>
           <div class="hero-sub">Twin-stick arena warfare driven by a DistilBERT battle-cry classifier.</div>
@@ -265,41 +277,38 @@ def deploy_arena(payload: dict) -> None:
     theme = payload["theme"]
     st.markdown(
         f"""
-        <div style="display:flex;gap:10px;margin:6px 0 12px;font-family:Orbitron,sans-serif;">
-          <div style="flex:1;border:1px solid {theme['primary']};padding:10px 12px;background:rgba(4,8,18,.75);">
-            <div style="font-size:10px;letter-spacing:.18em;color:{theme['primary']};">PROTOCOL</div>
-            <div style="font-size:15px;color:#e8f6ff;margin-top:4px;">{theme['name']}</div>
+        <div style="display:flex;gap:8px;margin:0 0 6px;font-family:Orbitron,sans-serif;">
+          <div style="flex:1;border:1px solid {theme['primary']};padding:6px 10px;background:rgba(4,8,18,.75);">
+            <div style="font-size:9px;letter-spacing:.18em;color:{theme['primary']};">PROTOCOL</div>
+            <div style="font-size:13px;color:#e8f6ff;margin-top:2px;">{theme['name']}</div>
           </div>
-          <div style="flex:1;border:1px solid {theme['primary']};padding:10px 12px;background:rgba(4,8,18,.75);">
-            <div style="font-size:10px;letter-spacing:.18em;color:{theme['primary']};">SENTIMENT</div>
-            <div style="font-size:15px;color:#e8f6ff;margin-top:4px;">{payload['label']} · {payload['confidence']*100:.0f}%</div>
+          <div style="flex:1;border:1px solid {theme['primary']};padding:6px 10px;background:rgba(4,8,18,.75);">
+            <div style="font-size:9px;letter-spacing:.18em;color:{theme['primary']};">SENTIMENT</div>
+            <div style="font-size:13px;color:#e8f6ff;margin-top:2px;">{payload['label']} · {payload['confidence']*100:.0f}%</div>
           </div>
-          <div style="flex:1;border:1px solid {theme['primary']};padding:10px 12px;background:rgba(4,8,18,.75);">
-            <div style="font-size:10px;letter-spacing:.18em;color:{theme['primary']};">LOADOUT</div>
-            <div style="font-size:15px;color:#e8f6ff;margin-top:4px;">HULL {payload['player_max_hp']} · x{payload['score_mult']:.1f} SCORE</div>
+          <div style="flex:1;border:1px solid {theme['primary']};padding:6px 10px;background:rgba(4,8,18,.75);">
+            <div style="font-size:9px;letter-spacing:.18em;color:{theme['primary']};">LOADOUT</div>
+            <div style="font-size:13px;color:#e8f6ff;margin-top:2px;">HULL {payload['player_max_hp']} · x{payload['score_mult']:.1f} SCORE</div>
           </div>
         </div>
-        <p style="font-family:Rajdhani,sans-serif;color:#9fd9e8;margin:0 0 8px;">
-          Click the arena first. Open the armory with <b>B</b> and click a card to buy.
-          Purchases show on the right <b>AVAILABLE</b> bar. Keys <b>1–6</b> switch weapons.
-        </p>
         """,
         unsafe_allow_html=True,
     )
     html = build_arena_html(payload)
-    # Stretch to the page width so the AVAILABLE rack is not clipped.
     if hasattr(st, "iframe"):
-        st.iframe(html, height="content", width="stretch")
+        st.iframe(html, height=640, width="stretch")
     else:
-        components.html(html, height=820, scrolling=False)
+        components.html(html, height=640, scrolling=False)
 
 
 def main() -> None:
     inject_chrome()
-    render_hero()
 
     if "payload" not in st.session_state:
         st.session_state.payload = None
+
+    live = bool(st.session_state.payload)
+    render_hero(compact=live)
 
     selected = nav_choice()
     if selected == "Intel Brief":
@@ -309,17 +318,19 @@ def main() -> None:
         render_loadout()
         return
 
-    st.markdown("#### Enter your Battle Cry")
-    # A form keeps keystrokes from rerunning Streamlit (which would remount the iframe).
-    with st.form("battle_cry_form", clear_on_submit=False):
-        cry = st.text_input(
-            "Battle Cry",
-            value="We rise in the neon and we do not fall.",
-            max_chars=160,
-            label_visibility="collapsed",
-            placeholder="Enter your Battle Cry:",
-        )
-        go = st.form_submit_button("DEPLOY TO ARENA", type="primary")
+    form_box = st.expander("New battle cry", expanded=False) if live else st.container()
+    if not live:
+        st.markdown("#### Enter your Battle Cry")
+    with form_box:
+        with st.form("battle_cry_form", clear_on_submit=False):
+            cry = st.text_input(
+                "Battle Cry",
+                value="We rise in the neon and we do not fall.",
+                max_chars=160,
+                label_visibility="collapsed",
+                placeholder="Enter your Battle Cry:",
+            )
+            go = st.form_submit_button("DEPLOY TO ARENA", type="primary")
     if go:
         with st.spinner("DistilBERT is reading the battle cry…"):
             nlp = get_nlp()

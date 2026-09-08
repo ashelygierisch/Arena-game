@@ -28,13 +28,18 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
     :root { --p: #00f0ff; --s: #7b61ff; --a: #ff2bd6; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
-      width: 100%; height: auto; overflow: hidden;
+      width: 100%; height: 100%; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
       background: #010104;
       font-family: "Rajdhani", "Segoe UI", sans-serif;
       color: #e8f6ff;
     }
     .shell {
-      position: relative; width: 100%; max-width: 100%; height: auto; min-height: 700px; margin: 0 auto;
+      position: relative;
+      width: min(100%, calc(100vh * 1080 / 700));
+      height: min(100%, calc(100vw * 700 / 1080));
+      max-width: 100%; max-height: 100%;
+      display: flex; flex-direction: column;
       background:
         radial-gradient(700px 240px at 20% 0%, rgba(0,240,255,.16), transparent 60%),
         radial-gradient(600px 220px at 90% 10%, rgba(255,43,214,.12), transparent 55%),
@@ -43,7 +48,7 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
       box-shadow: 0 0 0 1px rgba(255,43,214,.4), 0 0 36px rgba(0,240,255,.32);
     }
     .topbar {
-      height: 44px; display: flex; align-items: center; justify-content: space-between;
+      flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: space-between;
       padding: 0 18px;
       background: linear-gradient(90deg, #031018, #12061c 52%, #031018);
       border-bottom: 1px solid var(--p);
@@ -60,16 +65,17 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
       background: rgba(0,240,255,.08); text-shadow: 0 0 8px var(--p);
     }
     #arena {
-      display: block; width: 100%; height: auto; aspect-ratio: 1080 / 620;
+      display: block; flex: 1 1 auto; width: 100%; min-height: 0;
+      aspect-ratio: 1080 / 620; max-height: calc(100% - 64px);
       background: #000; outline: none; cursor: crosshair;
     }
     .hint {
-      height: 36px; display: flex; align-items: center; justify-content: center; gap: 14px;
+      flex: 0 0 28px; height: 28px; display: flex; align-items: center; justify-content: center; gap: 14px;
       font-size: 12px; letter-spacing: .1em; color: #9fd9e8;
       border-top: 1px solid var(--p); background: #04040c;
     }
     .hint b { color: var(--p); }
-    .scan, .vignette { pointer-events: none; position: absolute; inset: 44px 0 36px 0; }
+    .scan, .vignette { pointer-events: none; position: absolute; inset: 36px 0 28px 0; }
     .scan {
       background: repeating-linear-gradient(to bottom, rgba(255,255,255,.03) 0 1px, transparent 1px 3px);
     }
@@ -145,7 +151,7 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
     const player = {
       x: (W - BAR_W) * 0.5, y: H * 0.55, vx: 0, vy: 0, angle: -Math.PI / 2, r: 16,
       hp: CFG.player_max_hp, maxHp: CFG.player_max_hp, fireCd: 0,
-      shields: 0, dashCd: 0, dashT: 0, hitT: 0, specialCd: 0, specialMax: 5,
+      shields: 0, dashCd: 0, dashT: 0, hitT: 0, specialCd: 0, specialMax: 5, healCd: 0,
       equip: "pulse", owned: { pulse: true }, velocity: false, rapid: false
     };
     const bullets = [], hostile = [], specials = [], enemies = [], particles = [], floaters = [];
@@ -313,7 +319,7 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
     function resetRun() {
       player.x = (W - BAR_W) * 0.5; player.y = H * 0.55; player.vx = 0; player.vy = 0;
       player.hp = player.maxHp; player.fireCd = 0; player.shields = 0;
-      player.dashCd = 0; player.dashT = 0; player.hitT = 0; player.specialCd = 0;
+      player.dashCd = 0; player.dashT = 0; player.hitT = 0; player.specialCd = 0; player.healCd = 0;
       player.equip = "pulse"; player.owned = { pulse: true }; player.velocity = false; player.rapid = false;
       bullets.length = 0; hostile.length = 0; specials.length = 0; enemies.length = 0; particles.length = 0; floaters.length = 0;
       bases.forEach(function (b) { b.progress = 0; b.owner = 0; });
@@ -496,12 +502,23 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
     }
 
     function updateBases(dt) {
+      player.healCd = (player.healCd || 0) - dt;
       for (let i = 0; i < bases.length; i++) {
         const b = bases[i];
         b.spin += dt;
         const playerOn = dist(player.x, player.y, b.x, b.y) < b.r + 8;
         let enemyOn = false;
         for (let j = 0; j < enemies.length; j++) if (dist(enemies[j].x, enemies[j].y, b.x, b.y) < b.r + 6) { enemyOn = true; break; }
+        if (playerOn) {
+          const before = player.hp;
+          const rate = b.owner === 1 ? 28 : 20;
+          player.hp = clamp(player.hp + rate * dt, 0, player.maxHp);
+          if (player.hp > before && player.healCd <= 0) {
+            floater(player.x, player.y - 26, "+HULL", P);
+            burst(player.x, player.y, P, 3, 40, 1.6);
+            player.healCd = 0.35;
+          }
+        }
         if (playerOn && !enemyOn) {
           b.progress = clamp(b.progress + dt * 28, 0, 100);
           if (b.progress >= 100 && b.owner !== 1) { b.owner = 1; floater(b.x, b.y - 40, "NODE SECURED", P); beep(520, 0.2, "sine", 0.07); }
@@ -812,7 +829,7 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
       ctx.textAlign = "center"; ctx.fillStyle = P; glow(P, 22);
       ctx.font = "900 40px " + FONT; ctx.fillText("NEON DOMINATION", (BAR_X) * 0.5, 120);
       ctx.fillStyle = A; ctx.font = "700 16px " + FONT; ctx.fillText("AI ARENA", (BAR_X) * 0.5, 150); noGlow();
-      panel(70, 180, BAR_X - 140, 300, P);
+      panel(70, 168, BAR_X - 140, 330, P);
       ctx.fillStyle = HUD; ctx.font = "600 14px " + FONT2;
       ctx.fillText("BATTLE CRY", (BAR_X) * 0.5, 210);
       ctx.font = "700 18px " + FONT; ctx.fillStyle = P;
@@ -830,7 +847,7 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
       for (let i = 0; i < lines.length; i++) ctx.fillText(lines[i], (BAR_X) * 0.5, 304 + i * 22);
       ctx.font = "700 15px " + FONT; ctx.fillStyle = P; glow(P, 10);
       ctx.globalAlpha = 0.65 + Math.sin(state.t * 4) * 0.35;
-      ctx.fillText("PRESS  ENTER  /  CLICK  TO  DROP  IN", (BAR_X) * 0.5, 560);
+      ctx.fillText("PRESS  ENTER  /  CLICK  TO  DROP  IN", (BAR_X) * 0.5, 470);
       ctx.globalAlpha = 1; noGlow();
     }
 
