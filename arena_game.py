@@ -96,6 +96,7 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
       <span><b>1-6</b> WEAPONS</span>
       <span><b>F</b> PLASMA</span>
       <span><b>ARROWS</b> STEER</span>
+      <span><b>R</b> PURGE 30s</span>
       <span><b>SPACE</b> DASH</span>
       <span><b>B</b> SHOP</span>
     </div>
@@ -145,13 +146,13 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
     const state = {
       mode: "boot", t: 0, wave: 1, cores: 0, score: 0, combo: 0, comboTimer: 0,
       capturedBonusArmed: true, shake: 0, banner: "", bannerT: 0, spawnTimer: 1.2,
-      enemiesAliveTarget: 7, shopNote: "", shopNoteT: 0,
+      enemiesAliveTarget: 4, shopNote: "", shopNoteT: 0,
       high: Number(localStorage.getItem("neonDominationHi") || 0)
     };
     const player = {
       x: (W - BAR_W) * 0.5, y: H * 0.55, vx: 0, vy: 0, angle: -Math.PI / 2, r: 16,
       hp: CFG.player_max_hp, maxHp: CFG.player_max_hp, fireCd: 0,
-      shields: 0, dashCd: 0, dashT: 0, hitT: 0, specialCd: 0, specialMax: 5, healCd: 0,
+      shields: 0, dashCd: 0, dashT: 0, hitT: 0, specialCd: 0, specialMax: 5, healCd: 0, purgeCd: 0, purgeMax: 30,
       equip: "pulse", owned: { pulse: true }, velocity: false, rapid: false
     };
     const bullets = [], hostile = [], specials = [], enemies = [], particles = [], floaters = [];
@@ -278,6 +279,27 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
       burst(player.x, player.y, A, 16, 180, 3); beep(160, 0.2, "sawtooth", 0.07);
     }
 
+    function purgeAll() {
+      if (state.mode !== "play") return;
+      if (player.purgeCd > 0) {
+        state.banner = "PURGE  " + Math.ceil(player.purgeCd) + "s";
+        state.bannerT = 0.9;
+        beep(90, 0.08, "square", 0.04);
+        return;
+      }
+      player.purgeCd = player.purgeMax;
+      state.shake = 14;
+      state.banner = "FIELD PURGE";
+      state.bannerT = 1.6;
+      beep(80, 0.28, "sawtooth", 0.08);
+      burst(player.x, player.y, A, 36, 320, 5);
+      for (let i = enemies.length - 1; i >= 0; i--) {
+        burst(enemies[i].x, enemies[i].y, P, 14, 200, 3);
+        killEnemy(enemies[i], i);
+      }
+      hostile.length = 0;
+    }
+
     function hurtPlayer(amount) {
       if (player.hitT > 0 || player.dashT > 0) return;
       if (player.shields > 0) {
@@ -319,13 +341,13 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
     function resetRun() {
       player.x = (W - BAR_W) * 0.5; player.y = H * 0.55; player.vx = 0; player.vy = 0;
       player.hp = player.maxHp; player.fireCd = 0; player.shields = 0;
-      player.dashCd = 0; player.dashT = 0; player.hitT = 0; player.specialCd = 0; player.healCd = 0;
+      player.dashCd = 0; player.dashT = 0; player.hitT = 0; player.specialCd = 0; player.healCd = 0; player.purgeCd = 0;
       player.equip = "pulse"; player.owned = { pulse: true }; player.velocity = false; player.rapid = false;
       bullets.length = 0; hostile.length = 0; specials.length = 0; enemies.length = 0; particles.length = 0; floaters.length = 0;
       bases.forEach(function (b) { b.progress = 0; b.owner = 0; b.guns = null; });
       state.wave = 1; state.cores = 0; state.score = 0; state.combo = 0; state.comboTimer = 0;
       state.capturedBonusArmed = true; state.shake = 0; state.spawnTimer = 0.6;
-      state.enemiesAliveTarget = 7; state.banner = "WAVE 01"; state.bannerT = 2.2; state.mode = "play";
+      state.enemiesAliveTarget = 4; state.banner = "WAVE 01"; state.bannerT = 2.2; state.mode = "play";
     }
 
     function note(msg, ok) {
@@ -397,6 +419,7 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
       player.hitT = Math.max(0, player.hitT - dt);
       player.fireCd = Math.max(0, player.fireCd - dt);
       player.specialCd = Math.max(0, player.specialCd - dt);
+      player.purgeCd = Math.max(0, player.purgeCd - dt);
       const target = nearestEnemy(player);
       const w = equipped();
       if (target) {
@@ -595,14 +618,14 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
     }
 
     function updateWaves(dt) {
-      const cap = Math.min(26, Math.round(state.enemiesAliveTarget * (CFG.spawn_rate_mult || 1)));
+      const cap = Math.min(10, Math.round(state.enemiesAliveTarget * (CFG.spawn_rate_mult || 1)));
       state.spawnTimer -= dt;
       if (enemies.length < cap && state.spawnTimer <= 0) {
         spawnEnemy();
-        state.spawnTimer = Math.max(0.16, 0.72 - state.wave * 0.035) / (CFG.spawn_rate_mult || 1);
+        state.spawnTimer = Math.max(0.4, 1.15 - state.wave * 0.04) / (CFG.spawn_rate_mult || 1);
       }
       if (state.score > state.wave * 220) {
-        state.wave += 1; state.enemiesAliveTarget = 7 + state.wave * 3;
+        state.wave += 1; state.enemiesAliveTarget = 4 + state.wave;
         state.banner = "WAVE " + String(state.wave).padStart(2, "0"); state.bannerT = 2; beep(440, 0.16, "square", 0.05);
       }
     }
@@ -871,7 +894,8 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
       ctx.fillStyle = HUD; ctx.font = "600 12px " + FONT2;
       ctx.fillText(Math.ceil(player.hp) + " / " + player.maxHp + "   SHD " + player.shields + "/3", 24, 64);
       const spec = player.specialCd > 0 ? player.specialCd.toFixed(1) + "s" : "RDY";
-      ctx.fillText("DASH " + (player.dashCd > 0 ? player.dashCd.toFixed(1) : "RDY") + "   F " + spec, 24, 84);
+      const purge = player.purgeCd > 0 ? Math.ceil(player.purgeCd) + "s" : "RDY";
+      ctx.fillText("DASH " + (player.dashCd > 0 ? player.dashCd.toFixed(1) : "RDY") + "   F " + spec + "   R " + purge, 24, 84);
 
       panel((BAR_X - 12) * 0.5 - 200, 12, 400, 44, S);
       ctx.textAlign = "center"; ctx.fillStyle = HUD; ctx.font = "700 12px " + FONT;
@@ -920,7 +944,7 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
         "WASD flies. 1 is the Pulse Cannon. Buy guns in the shop, then 2-6 to switch.",
         "Shop cards show a weapon image plus DMG / RATE / VEL / AOE bars.",
         "Purchases appear on the AVAILABLE rack to the right.",
-        "F steers a plasma bolt. Hostile drones return fire."
+        "F steers a plasma bolt. R purges every drone (30s cooldown)."
       ];
       for (let i = 0; i < lines.length; i++) ctx.fillText(lines[i], (BAR_X) * 0.5, 304 + i * 22);
       ctx.font = "700 15px " + FONT; ctx.fillStyle = P; glow(P, 10);
@@ -1023,6 +1047,7 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
         player.dashT = 0.18; player.dashCd = 1.45; player.hitT = 0.18; beep(240, 0.08, "sine", 0.05);
       }
       if (state.mode === "play" && (e.code === "KeyF" || e.code === "KeyQ")) launchSpecial();
+      if (state.mode === "play" && e.code === "KeyR") purgeAll();
       const slotMap = { Digit1: 1, Numpad1: 1, Digit2: 2, Numpad2: 2, Digit3: 3, Numpad3: 3, Digit4: 4, Numpad4: 4, Digit5: 5, Numpad5: 5, Digit6: 6, Numpad6: 6 };
       if (slotMap[e.code] && (state.mode === "play" || state.mode === "shop")) equipSlot(slotMap[e.code]);
     }
