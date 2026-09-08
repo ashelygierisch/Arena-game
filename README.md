@@ -11,12 +11,14 @@ Energy Cores drop from every kill. Open the **Upgrade Lab** with `B` and spend t
 | Control | Action |
 | --- | --- |
 | `WASD` | Move the interceptor |
+| `1` | Equip Pulse Cannon (starter) |
+| `2` `3` `4` `5` `6` | Switch to a purchased weapon |
 | `F` or `Q` | Launch a plasma bolt |
-| Arrow keys | Steer the plasma bolt (move the ship if no bolt is live) |
+| Arrow keys | Steer the plasma bolt |
 | `Space` | Dash (brief i-frames) |
-| Auto | Cannons lock the nearest drone |
-| `B` / `Esc` | Open / close Upgrade Lab |
-| Click a shop card, or `1` `2` `3` | Buy Rapid Fire / Triple Shot / Shield |
+| Auto | Equipped gun lock-fires the nearest drone |
+| `B` / `Esc` | Open / close the armory |
+| Click a shop card | Buy a weapon or module |
 | `Enter` | Start or reboot the run |
 
 ## AI sentiment logic
@@ -37,15 +39,20 @@ If `torch` / `transformers` cannot load (no weights, no network on first downloa
 
 Gameplay modifiers are computed **once in Python**, then injected into the Canvas document as JSON. The simulation never talks back to Streamlit during a frame — that is how the gunplay stays at 60 FPS.
 
-## Upgrades
+## Armory
 
-| Upgrade | Effect | Cost |
-| --- | --- | --- |
-| Rapid Fire | Shortens cannon cooldown, stacks 3 times | 60 / 120 / 180 cores |
-| Triple Shot | Three-bolt spread | 140 cores, once |
-| Shield | Absorbs one contact hit, carry up to 3 | 90 cores each |
+Shop cards show a drawn weapon image plus **DMG / RATE / VEL / AOE** bars. A purchase lights up on the right-hand **AVAILABLE** rack. Key `1` is always the Pulse Cannon; keys `2`–`6` switch only after you buy that gun.
 
-Weapon Level on the HUD = `1 + Rapid Fire ranks + Triple Shot`.
+| Slot | Weapon | Role | Cost |
+| --- | --- | --- | --- |
+| `1` | Pulse Cannon | Starter lock-fire | Free |
+| `2` | Rocket Pod | Slow blast warhead | 160 |
+| `3` | Velocity Needle | Bullet-speed booster pins | 150 |
+| `4` | Scatter Volt | Five-bolt cone | 140 |
+| `5` | Ion Lance | Piercing beam | 180 |
+| `6` | Seeker Swarm | Twin homing mites | 200 |
+
+Modules (also in the shop, shown at the bottom of the rack): Velocity Booster (+35% projectile speed), Rapid Coil (+30% fire rate), Shield Cell (absorb one hit, up to 3).
 
 ## Architecture
 

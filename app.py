@@ -213,8 +213,8 @@ def render_intel() -> None:
         ),
         (
             "03  ENERGY ECONOMY",
-            "Destroyed drones drop Energy Cores. Open the lab with B, then click a card "
-            "(or press 1 / 2 / 3) to buy Rapid Fire, Triple Shot, or Shield.",
+            "Destroyed drones drop Energy Cores. Open the armory with B and click a card "
+            "to rack rockets, velocity needles, and other guns. Purchases land on the right AVAILABLE bar.",
         ),
     ]
     for col, (title, body) in zip((c1, c2, c3), cards):
@@ -228,24 +228,22 @@ def render_intel() -> None:
 
 
 def render_loadout() -> None:
-    st.markdown("### Upgrade Lab")
-    a, b, c = st.columns(3)
-    a.markdown(
-        '<div class="intel-card"><h3>01  RAPID FIRE</h3>'
-        "<p>Shortens cannon cooldown. Stacks three times. Cost scales 60 / 120 / 180 cores.</p></div>",
-        unsafe_allow_html=True,
-    )
-    b.markdown(
-        '<div class="intel-card"><h3>02  TRIPLE SHOT</h3>'
-        "<p>Each volley becomes a three-bolt spread. Single purchase, 140 cores.</p></div>",
-        unsafe_allow_html=True,
-    )
-    c.markdown(
-        '<div class="intel-card"><h3>03  SHIELD</h3>'
-        "<p>Each layer eats one lethal contact. Carry up to three. 90 cores per layer.</p></div>",
-        unsafe_allow_html=True,
-    )
-    st.caption("Click a shop card in the arena to buy. Weapon Level = 1 + Rapid Fire ranks + Triple Shot. F fires a steerable plasma bolt.")
+    st.markdown("### Armory")
+    rows = [
+        ("1  PULSE CANNON", "Starter lock-fire. Always in the rack. Balanced damage and rate."),
+        ("2  ROCKET POD", "160 cores. Slow heavy warhead with blast radius."),
+        ("3  VELOCITY NEEDLE", "150 cores. Bullet-speed booster. Hyper-velocity pins."),
+        ("4  SCATTER VOLT", "140 cores. Five-bolt cone for close swarms."),
+        ("5  ION LANCE", "180 cores. Piercing beam-bolt."),
+        ("6  SEEKER SWARM", "200 cores. Twin homing mites."),
+    ]
+    cols = st.columns(3)
+    for i, (title, body) in enumerate(rows):
+        cols[i % 3].markdown(
+            f'<div class="intel-card"><h3>{title}</h3><p>{body}</p></div>',
+            unsafe_allow_html=True,
+        )
+    st.caption("Shop cards show a weapon image plus DMG / RATE / VEL / AOE. Bought guns appear on the right AVAILABLE bar. Keys 1–6 switch.")
 
 
 def deploy_arena(payload: dict) -> None:
@@ -268,8 +266,8 @@ def deploy_arena(payload: dict) -> None:
           </div>
         </div>
         <p style="font-family:Rajdhani,sans-serif;color:#9fd9e8;margin:0 0 8px;">
-          Click the arena first. Open shop with <b>B</b>, then <b>click a card</b> to buy.
-          <b>F</b> fires a steerable plasma bolt.
+          Click the arena first. Open the armory with <b>B</b> and click a card to buy.
+          Purchases show on the right <b>AVAILABLE</b> bar. Keys <b>1–6</b> switch weapons.
         </p>
         """,
         unsafe_allow_html=True,
