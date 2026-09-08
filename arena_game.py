@@ -28,13 +28,13 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
     :root { --p: #00f0ff; --s: #7b61ff; --a: #ff2bd6; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
-      width: 100%; height: 100%; overflow: hidden;
+      width: 100%; height: auto; overflow: hidden;
       background: #010104;
       font-family: "Rajdhani", "Segoe UI", sans-serif;
       color: #e8f6ff;
     }
     .shell {
-      position: relative; width: 1080px; height: 700px; margin: 0 auto;
+      position: relative; width: 100%; max-width: 100%; height: auto; min-height: 700px; margin: 0 auto;
       background:
         radial-gradient(700px 240px at 20% 0%, rgba(0,240,255,.16), transparent 60%),
         radial-gradient(600px 220px at 90% 10%, rgba(255,43,214,.12), transparent 55%),
@@ -59,7 +59,10 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
       padding: 5px 12px; border: 1px solid var(--p); color: var(--p);
       background: rgba(0,240,255,.08); text-shadow: 0 0 8px var(--p);
     }
-    #arena { display: block; width: 1080px; height: 620px; background: #000; outline: none; cursor: crosshair; }
+    #arena {
+      display: block; width: 100%; height: auto; aspect-ratio: 1080 / 620;
+      background: #000; outline: none; cursor: crosshair;
+    }
     .hint {
       height: 36px; display: flex; align-items: center; justify-content: center; gap: 14px;
       font-size: 12px; letter-spacing: .1em; color: #9fd9e8;

@@ -38,10 +38,24 @@ def inject_chrome() -> None:
             color: #e8f6ff;
           }
           header, footer, [data-testid="stToolbar"], #MainMenu { visibility: hidden; height: 0; }
-          .block-container {
-            padding-top: 1.1rem;
-            padding-bottom: 1.4rem;
-            max-width: 1180px;
+          [data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"] { display: none !important; }
+          .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"] {
+            overflow-x: hidden;
+          }
+          .block-container,
+          [data-testid="stMainBlockContainer"],
+          .stMainBlockContainer {
+            max-width: 100% !important;
+            width: 100% !important;
+            padding-top: 0.8rem !important;
+            padding-bottom: 1rem !important;
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+          }
+          [data-testid="stIFrame"],
+          iframe {
+            width: 100% !important;
+            max-width: 100% !important;
           }
           h1, h2, h3, .stMarkdown p, .stCaption, label {
             font-family: "Rajdhani", sans-serif;
@@ -273,11 +287,11 @@ def deploy_arena(payload: dict) -> None:
         unsafe_allow_html=True,
     )
     html = build_arena_html(payload)
-    # Streamlit 1.50+ replaced components.html with st.iframe for srcdoc embeds.
+    # Stretch to the page width so the AVAILABLE rack is not clipped.
     if hasattr(st, "iframe"):
-        st.iframe(html, height=720, width="stretch")
+        st.iframe(html, height="content", width="stretch")
     else:
-        components.html(html, height=720, scrolling=False)
+        components.html(html, height=820, scrolling=False)
 
 
 def main() -> None:
