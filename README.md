@@ -92,3 +92,7 @@ The pipeline uses CUDA when PyTorch can see a GPU, otherwise CPU. Sentiment infe
 The outer deck uses Orbitron / Rajdhani, glowing borders, and a scanline overlay. Inside the Canvas: animated grid, hexagonal drones, capture rings, hull bar, cores, node count, weapon level, and a local high score in `localStorage`.
 
 This project is a self-contained demo of **AI-conditioned game design**: language in, systemic rules out, no generative text during combat.
+
+## License
+
+This project is released under the [MIT License](LICENSE).
