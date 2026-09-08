@@ -10,13 +10,14 @@ Energy Cores drop from every kill. Open the **Upgrade Lab** with `B` and spend t
 
 | Control | Action |
 | --- | --- |
-| `WASD` or Arrow keys | Move |
+| `WASD` | Move the interceptor |
+| `F` or `Q` | Launch a plasma bolt |
+| Arrow keys | Steer the plasma bolt (move the ship if no bolt is live) |
 | `Space` | Dash (brief i-frames) |
-| Auto | Fire at the nearest enemy |
+| Auto | Cannons lock the nearest drone |
 | `B` / `Esc` | Open / close Upgrade Lab |
-| `1` `2` `3` | Buy Rapid Fire / Triple Shot / Shield |
+| Click a shop card, or `1` `2` `3` | Buy Rapid Fire / Triple Shot / Shield |
 | `Enter` | Start or reboot the run |
-| Click the arena | Focus the iframe so keys register |
 
 ## AI sentiment logic
 

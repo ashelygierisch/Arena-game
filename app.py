@@ -203,18 +203,18 @@ def render_intel() -> None:
     cards = [
         (
             "01  MOVEMENT",
-            "Pilot with WASD or the arrow keys. Space triggers a short invulnerable dash. "
-            "The hull auto-locks the nearest drone and fires without a trigger pull.",
+            "Pilot with WASD. Space dashes. F fires a plasma bolt you steer with the arrow keys. "
+            "Cannons still auto-lock the nearest drone.",
         ),
         (
             "02  NODE CONTROL",
             "Three capture nodes sit on the grid. Stand inside a ring to claim it. "
-            "Each owned node raises your score multiplier. Own all three for a Total Domination bonus.",
+            "Hostile drones shoot back and will contest those nodes. Own all three for a Total Domination bonus.",
         ),
         (
             "03  ENERGY ECONOMY",
-            "Destroyed drones drop Energy Cores. Open the Upgrade Lab with B and spend cores on "
-            "Rapid Fire, Triple Shot, or Shield layers mid-match.",
+            "Destroyed drones drop Energy Cores. Open the lab with B, then click a card "
+            "(or press 1 / 2 / 3) to buy Rapid Fire, Triple Shot, or Shield.",
         ),
     ]
     for col, (title, body) in zip((c1, c2, c3), cards):
@@ -245,19 +245,34 @@ def render_loadout() -> None:
         "<p>Each layer eats one lethal contact. Carry up to three. 90 cores per layer.</p></div>",
         unsafe_allow_html=True,
     )
-    st.caption("Weapon Level on the HUD equals 1 + Rapid Fire ranks + Triple Shot unlock.")
+    st.caption("Click a shop card in the arena to buy. Weapon Level = 1 + Rapid Fire ranks + Triple Shot. F fires a steerable plasma bolt.")
 
 
 def deploy_arena(payload: dict) -> None:
     """Paint protocol telemetry, then drop the player into the Canvas match."""
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Protocol", payload["theme"]["name"])
-    m2.metric("Sentiment", payload["label"])
-    m3.metric("Confidence", f"{payload['confidence'] * 100:.1f}%")
-    m4.metric("Score Mult", f"{payload['score_mult']:.1f}×")
-    st.caption(
-        f"Analyzer: `{payload['source']}`  ·  Hull {payload['player_max_hp']} HP  ·  "
-        f"Enemy speed ×{payload['enemy_speed_mult']:.2f}  ·  Click the arena to capture keyboard."
+    theme = payload["theme"]
+    st.markdown(
+        f"""
+        <div style="display:flex;gap:10px;margin:6px 0 12px;font-family:Orbitron,sans-serif;">
+          <div style="flex:1;border:1px solid {theme['primary']};padding:10px 12px;background:rgba(4,8,18,.75);">
+            <div style="font-size:10px;letter-spacing:.18em;color:{theme['primary']};">PROTOCOL</div>
+            <div style="font-size:15px;color:#e8f6ff;margin-top:4px;">{theme['name']}</div>
+          </div>
+          <div style="flex:1;border:1px solid {theme['primary']};padding:10px 12px;background:rgba(4,8,18,.75);">
+            <div style="font-size:10px;letter-spacing:.18em;color:{theme['primary']};">SENTIMENT</div>
+            <div style="font-size:15px;color:#e8f6ff;margin-top:4px;">{payload['label']} · {payload['confidence']*100:.0f}%</div>
+          </div>
+          <div style="flex:1;border:1px solid {theme['primary']};padding:10px 12px;background:rgba(4,8,18,.75);">
+            <div style="font-size:10px;letter-spacing:.18em;color:{theme['primary']};">LOADOUT</div>
+            <div style="font-size:15px;color:#e8f6ff;margin-top:4px;">HULL {payload['player_max_hp']} · x{payload['score_mult']:.1f} SCORE</div>
+          </div>
+        </div>
+        <p style="font-family:Rajdhani,sans-serif;color:#9fd9e8;margin:0 0 8px;">
+          Click the arena first. Open shop with <b>B</b>, then <b>click a card</b> to buy.
+          <b>F</b> fires a steerable plasma bolt.
+        </p>
+        """,
+        unsafe_allow_html=True,
     )
     html = build_arena_html(payload)
     # Streamlit 1.50+ replaced components.html with st.iframe for srcdoc embeds.
