@@ -197,20 +197,410 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
       return cards;
     }
 
+    const music = {
+      ready: false, running: false, timer: 0, nextT: 0, step: 0, bpm: 128,
+      intensity: 0.45, noise: null, bus: null, pad: null, scene: "briefing", lastScene: ""
+    };
+
     function ensureAudio() {
       if (!audioCtx) {
         const AC = window.AudioContext || window.webkitAudioContext;
         if (AC) audioCtx = new AC();
       }
       if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+      if (audioCtx && !music.ready) initBattleAudio();
+      if (audioCtx && !music.running) startBattleMusic();
     }
+
+    function makeNoiseBuffer() {
+      const len = audioCtx.sampleRate * 2;
+      const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+      const data = buf.getChannelData(0);
+      let last = 0;
+      for (let i = 0; i < len; i++) {
+        const white = Math.random() * 2 - 1;
+        last = (last + 0.02 * white) / 1.02;
+        data[i] = last * 3.5;
+      }
+      return buf;
+    }
+
+    function envGain(t, peak, attack, hold, release) {
+      const g = audioCtx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t + attack);
+      g.gain.setValueAtTime(Math.max(0.0002, peak), t + attack + hold);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + attack + hold + release);
+      return g;
+    }
+
+    function initBattleAudio() {
+      music.noise = makeNoiseBuffer();
+      const comp = audioCtx.createDynamicsCompressor();
+      comp.threshold.value = -18;
+      comp.knee.value = 18;
+      comp.ratio.value = 6;
+      comp.attack.value = 0.003;
+      comp.release.value = 0.18;
+      music.bus = audioCtx.createGain();
+      music.bus.gain.value = 0.0001;
+      music.bus.connect(comp);
+      comp.connect(audioCtx.destination);
+      music.sfx = audioCtx.createGain();
+      music.sfx.gain.value = 0.55;
+      music.sfx.connect(comp);
+
+      const rumbleSrc = audioCtx.createBufferSource();
+      rumbleSrc.buffer = music.noise;
+      rumbleSrc.loop = true;
+      const rumbleF = audioCtx.createBiquadFilter();
+      rumbleF.type = "lowpass";
+      rumbleF.frequency.value = 90;
+      rumbleF.Q.value = 0.7;
+      const rumbleG = audioCtx.createGain();
+      rumbleG.gain.value = 0.11;
+      rumbleSrc.connect(rumbleF);
+      rumbleF.connect(rumbleG);
+      rumbleG.connect(music.bus);
+      rumbleSrc.start();
+      music.rumbleF = rumbleF;
+
+      function startPadVoice(freq, detune, gain) {
+        const o = audioCtx.createOscillator();
+        o.type = "sawtooth";
+        o.frequency.value = freq;
+        o.detune.value = detune;
+        const f = audioCtx.createBiquadFilter();
+        f.type = "lowpass";
+        f.frequency.value = 420;
+        f.Q.value = 0.8;
+        const g = audioCtx.createGain();
+        g.gain.value = gain;
+        o.connect(f);
+        f.connect(g);
+        g.connect(music.bus);
+        o.start();
+        return { osc: o, filter: f };
+      }
+      music.padA = startPadVoice(110, -7, 0.035);
+      music.padB = startPadVoice(164.81, 6, 0.028);
+      music.padC = startPadVoice(220, -4, 0.018);
+      music.ready = true;
+    }
+
+    function playerOnAnyNode() {
+      for (let i = 0; i < bases.length; i++) {
+        if (dist(player.x, player.y, bases[i].x, bases[i].y) < bases[i].r + 8) return true;
+      }
+      return false;
+    }
+
+    function battlefieldScene() {
+      if (state.mode === "boot") return "briefing";
+      if (state.mode === "shop") return "armory";
+      if (state.mode === "over") return "lost";
+      const hp = player.maxHp ? player.hp / player.maxHp : 1;
+      const nodes = capturedCount();
+      if (hp < 0.32) return "critical";
+      if (nodes === 3) return "dominion";
+      if (playerOnAnyNode()) return "securing";
+      if (enemies.length >= 6 || state.combo >= 5) return "swarm";
+      if (enemies.length <= 2 && hp > 0.55) return "calm";
+      return "combat";
+    }
+
+    function sceneProfile(scene) {
+      const mood = (CFG.label || "NEUTRAL").toUpperCase();
+      const profiles = {
+        briefing: { bpm: 84, bus: 0.07, pads: [98, 123.47, 146.83], tag: "BRIEFING BED" },
+        armory: { bpm: 96, bus: 0.1, pads: [110, 138.59, 164.81], tag: "ARMORY AMBIENT" },
+        lost: { bpm: 68, bus: 0.035, pads: [82.41, 98, 103.83], tag: "SIGNAL LOST" },
+        calm: { bpm: 110, bus: 0.16, pads: mood === "NEGATIVE" ? [110, 130.81, 164.81] : [130.81, 164.81, 196], tag: "HOLDING PATTERN" },
+        combat: { bpm: 128, bus: 0.2, pads: [110, 164.81, 220], tag: "CONTACT" },
+        swarm: { bpm: 146, bus: 0.24, pads: [123.47, 185, 246.94], tag: "SWARM OVERDRIVE" },
+        critical: { bpm: 154, bus: 0.22, pads: [103.83, 155.56, 207.65], tag: "HULL CRITICAL" },
+        securing: { bpm: 118, bus: 0.19, pads: mood === "NEGATIVE" ? [116.54, 155.56, 185] : [146.83, 184.99, 220], tag: "NODE LOCK" },
+        dominion: { bpm: 136, bus: 0.23, pads: [146.83, 184.99, 246.94], tag: "TOTAL DOMINION" }
+      };
+      return profiles[scene] || profiles.combat;
+    }
+
+    function playAlarm(t) {
+      const o = audioCtx.createOscillator();
+      o.type = "square";
+      o.frequency.setValueAtTime(740, t);
+      o.frequency.setValueAtTime(620, t + 0.06);
+      const g = envGain(t, 0.045, 0.002, 0.03, 0.05);
+      const f = audioCtx.createBiquadFilter();
+      f.type = "bandpass";
+      f.frequency.value = 900;
+      o.connect(f);
+      f.connect(g);
+      g.connect(music.bus);
+      o.start(t);
+      o.stop(t + 0.1);
+    }
+
+    function playChime(t, freqs) {
+      for (let i = 0; i < freqs.length; i++) {
+        const o = audioCtx.createOscillator();
+        o.type = "sine";
+        o.frequency.value = freqs[i];
+        const g = envGain(t + i * 0.03, 0.06, 0.01, 0.08, 0.45);
+        o.connect(g);
+        g.connect(music.bus);
+        o.start(t + i * 0.03);
+        o.stop(t + 0.6);
+      }
+    }
+
+    function playKick(t) {
+      const o = audioCtx.createOscillator();
+      o.type = "sine";
+      o.frequency.setValueAtTime(168, t);
+      o.frequency.exponentialRampToValueAtTime(42, t + 0.14);
+      const g = envGain(t, 0.72, 0.004, 0.03, 0.16);
+      o.connect(g);
+      g.connect(music.bus);
+      o.start(t);
+      o.stop(t + 0.22);
+      const click = audioCtx.createBufferSource();
+      click.buffer = music.noise;
+      const hf = audioCtx.createBiquadFilter();
+      hf.type = "highpass";
+      hf.frequency.value = 1500;
+      const cg = envGain(t, 0.16, 0.001, 0.004, 0.03);
+      click.connect(hf);
+      hf.connect(cg);
+      cg.connect(music.bus);
+      click.start(t);
+      click.stop(t + 0.04);
+    }
+
+    function playSnare(t) {
+      const n = audioCtx.createBufferSource();
+      n.buffer = music.noise;
+      const bp = audioCtx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.value = 2100;
+      bp.Q.value = 0.9;
+      const ng = envGain(t, 0.28 * (0.7 + music.intensity * 0.5), 0.002, 0.03, 0.14);
+      n.connect(bp);
+      bp.connect(ng);
+      ng.connect(music.bus);
+      n.start(t);
+      n.stop(t + 0.2);
+      const o = audioCtx.createOscillator();
+      o.type = "triangle";
+      o.frequency.setValueAtTime(196, t);
+      o.frequency.exponentialRampToValueAtTime(110, t + 0.1);
+      const og = envGain(t, 0.12, 0.002, 0.02, 0.1);
+      o.connect(og);
+      og.connect(music.bus);
+      o.start(t);
+      o.stop(t + 0.14);
+    }
+
+    function playHat(t, open) {
+      const n = audioCtx.createBufferSource();
+      n.buffer = music.noise;
+      const hp = audioCtx.createBiquadFilter();
+      hp.type = "highpass";
+      hp.frequency.value = open ? 6500 : 9000;
+      const g = envGain(t, open ? 0.07 : 0.045, 0.001, open ? 0.03 : 0.008, open ? 0.08 : 0.03);
+      n.connect(hp);
+      hp.connect(g);
+      g.connect(music.bus);
+      n.start(t);
+      n.stop(t + (open ? 0.14 : 0.05));
+    }
+
+    function playBass(t, freq) {
+      const o = audioCtx.createOscillator();
+      o.type = "sawtooth";
+      o.frequency.setValueAtTime(freq, t);
+      const f = audioCtx.createBiquadFilter();
+      f.type = "lowpass";
+      f.Q.value = 6;
+      f.frequency.setValueAtTime(90, t);
+      f.frequency.exponentialRampToValueAtTime(280 + music.intensity * 420, t + 0.03);
+      f.frequency.exponentialRampToValueAtTime(110, t + 0.18);
+      const g = envGain(t, 0.2, 0.006, 0.05, 0.16);
+      o.connect(f);
+      f.connect(g);
+      g.connect(music.bus);
+      o.start(t);
+      o.stop(t + 0.24);
+    }
+
+    function playStab(t, notes) {
+      notes = notes || [220, 261.63, 329.63];
+      for (let i = 0; i < notes.length; i++) {
+        const o = audioCtx.createOscillator();
+        o.type = "square";
+        o.frequency.value = notes[i];
+        const f = audioCtx.createBiquadFilter();
+        f.type = "lowpass";
+        f.frequency.setValueAtTime(900, t);
+        f.frequency.exponentialRampToValueAtTime(280, t + 0.35);
+        const g = envGain(t, 0.045, 0.01, 0.08, 0.32);
+        o.connect(f);
+        f.connect(g);
+        g.connect(music.bus);
+        o.start(t);
+        o.stop(t + 0.45);
+      }
+    }
+
+    function scheduleStep(t, step) {
+      const scene = music.scene;
+      const mood = (CFG.label || "NEUTRAL").toUpperCase();
+      const i = music.intensity;
+      const bassMap = {
+        briefing: [55, 0, 55, 0, 49, 0, 55, 0],
+        armory: [55, 0, 65.41, 0, 49, 0, 73.42, 0],
+        lost: [41.2, 0, 0, 0, 36.71, 0, 0, 0],
+        calm: mood === "NEGATIVE" ? [55, 0, 58.27, 0, 49, 0, 51.91, 0] : [65.41, 0, 73.42, 0, 82.41, 0, 73.42, 0],
+        combat: [55, 55, 65.41, 49, 55, 41.2, 43.65, 49],
+        swarm: [55, 55, 61.74, 55, 49, 55, 73.42, 49],
+        critical: [46.25, 49, 51.91, 49, 41.2, 46.25, 55, 49],
+        securing: [65.41, 0, 82.41, 0, 73.42, 0, 98, 0],
+        dominion: [73.42, 73.42, 82.41, 65.41, 98, 82.41, 73.42, 65.41]
+      };
+      const stabMap = {
+        calm: mood === "NEGATIVE" ? [220, 261.63, 311.13] : [261.63, 329.63, 392],
+        combat: mood === "NEGATIVE" ? [220, 261.63, 311.13] : [220, 261.63, 329.63],
+        swarm: [246.94, 293.66, 369.99],
+        critical: [233.08, 277.18, 311.13],
+        securing: [293.66, 349.23, 440],
+        dominion: [329.63, 392, 493.88]
+      };
+      const line = bassMap[scene] || bassMap.combat;
+
+      if (scene === "briefing") {
+        if (step % 16 === 0) playKick(t);
+        if (step % 8 === 0 && line[(step >> 1) % 8]) playBass(t, line[(step >> 1) % 8]);
+        return;
+      }
+      if (scene === "lost") {
+        if (step % 8 === 0) playKick(t);
+        if (step % 16 === 8) playAlarm(t);
+        return;
+      }
+      if (scene === "armory") {
+        if (step % 8 === 0) playKick(t);
+        if (step % 8 === 4) playHat(t, true);
+        if (step % 2 === 0 && line[(step >> 1) % 8]) playBass(t, line[(step >> 1) % 8]);
+        return;
+      }
+
+      if (step % 4 === 0) playKick(t);
+      if ((scene === "swarm" || scene === "critical") && step % 8 === 6) playKick(t);
+      if (scene === "dominion" && step % 8 === 2) playKick(t);
+      if (step % 8 === 4 && scene !== "calm") playSnare(t);
+      if (scene === "calm" && step % 16 === 8) playSnare(t);
+      if (step % 2 === 0) playHat(t, false);
+      else if (scene === "swarm" || scene === "critical" || i > 0.55) playHat(t, step % 8 === 7);
+      if (scene === "critical" && step % 4 === 2) playAlarm(t);
+      if (step % 2 === 0 && line[(step >> 1) % 8]) playBass(t, line[(step >> 1) % 8]);
+      const stabs = stabMap[scene];
+      if (stabs && (step === 0 || (scene === "dominion" && step === 16) || (scene === "swarm" && step === 16))) playStab(t, stabs);
+    }
+
+    function musicTick() {
+      if (!audioCtx || !music.ready) return;
+      const now = audioCtx.currentTime;
+      const scene = battlefieldScene();
+      const profile = sceneProfile(scene);
+      if (scene !== music.scene) {
+        music.scene = scene;
+        music.step = 0;
+        music.nextT = now + 0.02;
+        if (state.mode === "play") {
+          state.banner = profile.tag;
+          state.bannerT = 1.15;
+          playChime(now, profile.pads);
+        }
+      }
+      music.bpm = profile.bpm * (CFG.label === "NEGATIVE" && scene !== "briefing" ? 1.06 : CFG.label === "POSITIVE" ? 0.97 : 1);
+      const stepDur = 60 / music.bpm / 4;
+      while (music.nextT < now + 0.12) {
+        scheduleStep(music.nextT, music.step);
+        music.nextT += stepDur;
+        music.step = (music.step + 1) % 32;
+      }
+      music.intensity = Math.min(1, 0.3 + state.wave * 0.035 + enemies.length * 0.04 + (scene === "critical" ? 0.25 : 0) + (scene === "swarm" ? 0.2 : 0));
+      music.bus.gain.setTargetAtTime(profile.bus, now, 0.28);
+      if (music.rumbleF) music.rumbleF.frequency.setTargetAtTime(scene === "critical" ? 140 : scene === "swarm" ? 110 : 72, now, 0.35);
+      const pads = [music.padA, music.padB, music.padC];
+      for (let i = 0; i < 3; i++) {
+        if (pads[i] && pads[i].osc) pads[i].osc.frequency.setTargetAtTime(profile.pads[i], now, 0.55);
+        if (pads[i] && pads[i].filter) pads[i].filter.frequency.setTargetAtTime(320 + music.intensity * 640, now, 0.45);
+      }
+    }
+
+    function startBattleMusic() {
+      if (!music.ready || music.running) return;
+      music.running = true;
+      music.nextT = audioCtx.currentTime + 0.05;
+      music.step = 0;
+      music.timer = setInterval(musicTick, 25);
+      musicTick();
+    }
+
     function beep(freq, dur, type, gain) {
       if (!audioCtx) return;
-      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
-      o.type = type || "square"; o.frequency.value = freq; g.gain.value = gain || 0.04;
-      o.connect(g); g.connect(audioCtx.destination);
-      o.start(); g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
-      o.stop(audioCtx.currentTime + dur);
+      const t = audioCtx.currentTime;
+      const o = audioCtx.createOscillator();
+      o.type = type || "sine";
+      o.frequency.setValueAtTime(freq, t);
+      o.frequency.exponentialRampToValueAtTime(Math.max(40, freq * 0.55), t + dur);
+      const f = audioCtx.createBiquadFilter();
+      f.type = "lowpass";
+      f.frequency.setValueAtTime(freq * 2.2, t);
+      f.frequency.exponentialRampToValueAtTime(400, t + dur);
+      const g = envGain(t, gain || 0.05, 0.004, dur * 0.25, dur * 0.75);
+      o.connect(f);
+      f.connect(g);
+      g.connect(music.sfx || audioCtx.destination);
+      o.start(t);
+      o.stop(t + dur + 0.05);
+    }
+
+    function sfxShot(heavy) {
+      if (!audioCtx || !music.ready) return;
+      const t = audioCtx.currentTime;
+      const n = audioCtx.createBufferSource();
+      n.buffer = music.noise;
+      const bp = audioCtx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.setValueAtTime(heavy ? 700 : 2400, t);
+      bp.frequency.exponentialRampToValueAtTime(heavy ? 180 : 700, t + 0.07);
+      const g = envGain(t, heavy ? 0.22 : 0.09, 0.001, 0.01, heavy ? 0.12 : 0.05);
+      n.connect(bp);
+      bp.connect(g);
+      g.connect(music.sfx);
+      n.start(t);
+      n.stop(t + 0.14);
+      beep(heavy ? 140 : 980, heavy ? 0.1 : 0.045, "sine", heavy ? 0.08 : 0.035);
+    }
+
+    function sfxBoom() {
+      if (!audioCtx || !music.ready) return;
+      const t = audioCtx.currentTime;
+      const n = audioCtx.createBufferSource();
+      n.buffer = music.noise;
+      const lp = audioCtx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.setValueAtTime(900, t);
+      lp.frequency.exponentialRampToValueAtTime(80, t + 0.28);
+      const g = envGain(t, 0.32, 0.002, 0.04, 0.32);
+      n.connect(lp);
+      lp.connect(g);
+      g.connect(music.sfx);
+      n.start(t);
+      n.stop(t + 0.4);
+      beep(90, 0.22, "sine", 0.12);
     }
     function burst(x, y, color, n, speed, size) {
       for (let i = 0; i < n; i++) {
@@ -267,7 +657,7 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
         });
       }
       burst(player.x + Math.cos(ang) * 18, player.y + Math.sin(ang) * 18, w.tint, 5, 90, 2);
-      beep(w.id === "rocket" ? 140 : 640, 0.05, w.id === "rocket" ? "sawtooth" : "square", 0.03);
+      sfxShot(w.id === "rocket");
     }
 
     function launchSpecial() {
@@ -292,7 +682,7 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
       state.banner = "ALL DRONES DOWN";
       state.bannerT = 1.6;
       beep(80, 0.28, "sawtooth", 0.08);
-      burst(player.x, player.y, A, 36, 320, 5);
+      burst(player.x, player.y, A, 36, 320, 5); sfxBoom(); sfxBoom();
       for (let i = enemies.length - 1; i >= 0; i--) {
         burst(enemies[i].x, enemies[i].y, P, 14, 200, 3);
         killEnemy(enemies[i], i);
@@ -323,7 +713,7 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
       const pts = Math.round(basePts * (CFG.score_mult || 1) * captureMult() * (1 + state.combo * 0.08));
       const cores = Math.round((e.kind === "tank" ? 8 : e.kind === "hunter" ? 5 : 3) * (CFG.score_mult || 1));
       state.score += pts; state.cores += cores;
-      floater(e.x, e.y - 10, "+" + cores + " CORES", P); beep(140, 0.1, "sawtooth", 0.05);
+      floater(e.x, e.y - 10, "+" + cores + " CORES", P); sfxBoom();
       if (state.score > state.high) { state.high = state.score; localStorage.setItem("neonDominationHi", String(state.high)); }
     }
 
@@ -340,6 +730,7 @@ ARENA_DOCUMENT = r"""<!DOCTYPE html>
     }
 
     function resetRun() {
+      ensureAudio();
       player.x = (W - BAR_W) * 0.5; player.y = H * 0.55; player.vx = 0; player.vy = 0;
       player.hp = player.maxHp; player.fireCd = 0; player.shields = 0;
       player.dashCd = 0; player.dashT = 0; player.hitT = 0; player.specialCd = 0; player.healCd = 0; player.purgeCd = 0;
